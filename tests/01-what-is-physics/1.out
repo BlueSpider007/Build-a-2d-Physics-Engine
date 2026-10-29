@@ -1,0 +1,4 @@
+steps=0 t=0 acc=16 alpha=0.8000
+steps=1 t=20 acc=12 alpha=0.6000
+steps=4 t=100 acc=2 alpha=0.1000
+steps=5 t=200 acc=2 alpha=0.1000

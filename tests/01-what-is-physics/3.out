@@ -1,0 +1,5 @@
+steps=2 t=40 acc=0 alpha=0.0000
+steps=1 t=60 acc=0 alpha=0.0000
+steps=0 t=60 acc=0 alpha=0.0000
+steps=0 t=60 acc=19 alpha=0.9500
+steps=1 t=80 acc=0 alpha=0.0000
