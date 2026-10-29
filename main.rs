@@ -1,20 +1,13 @@
 use std::io::{self, Read};
 
-struct Body {
-    px: f64,
-    py: f64,
-    vx: f64,
-    vy: f64,
-}
-
+#[derive(Copy, Clone)]
 struct World {
-    dt: f64,
+    k: f64,
     mass: f64,
-    gx: f64,
-    gy: f64,
-    drag: f64,
-    fx: f64,
-    fy: f64,
+    dt: f64,
+    x: f64,
+    v: f64,
+    steps: u32,
 }
 
 fn f4(x: f64) -> String {
@@ -25,44 +18,47 @@ fn f4(x: f64) -> String {
         s
     }
 }
-
-// Advance body b by one step of world w, in place.
-fn step(_b: &mut Body, _w: &World) {
-    // TODO: mass 0 means immovable (return at once). Otherwise:
-    //   net force = applied + mass * g - drag * v   (v from the START of the step)
-    //   acceleration = net force * (1 / mass)
-    //   update the velocity first, then the position with the NEW velocity
-    if _w.mass == 0.0 {
-        return;
+fn energy(_w: World) -> f64 {
+    0.5 * _w.mass * _w.v * _w.v + 0.5 * _w.k * _w.x * _w.x
+}
+fn ratio(e: f64, e0: f64) -> f64 {
+    if e0 == 0.0 {
+        1.0
     } else {
-        let fx = _w.fx + _w.mass * _w.gx - _w.drag * _b.vx;
-        let fy = _w.fy + _w.mass * _w.gy - _w.drag * _b.vy;
-        _b.vx += fx / _w.mass * _w.dt;
-        _b.vy += fy / _w.mass * _w.dt;
-        _b.px += _b.vx * _w.dt;
-        _b.py += _b.vy * _w.dt;
+        e / e0
     }
+}
+fn symplectic(_w: World) -> (f64, f64) {
+    let mut w = _w;
+    for _i in 0..w.steps {
+        let a = -w.k * w.x / w.mass;
+        w.v += a * w.dt;
+        w.x += w.v * w.dt;
+    }
+    (w.x, w.v)
+}
+fn explicit(_w: World) -> (f64, f64) {
+    let mut w = _w;
+    for _i in 0..w.steps {
+        let a = -w.k * w.x / w.mass;
+        w.x += w.v * w.dt;
+        w.v += a * w.dt;
+    }
+    (w.x, w.v)
 }
 
 fn main() {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
     let mut w = World {
-        dt: 0.0,
+        k: 1.0,
         mass: 1.0,
-        gx: 0.0,
-        gy: 0.0,
-        drag: 0.0,
-        fx: 0.0,
-        fy: 0.0,
+        dt: 0.1,
+        x: 0.0,
+        v: 0.0,
+        steps: 0,
     };
-    let mut b = Body {
-        px: 0.0,
-        py: 0.0,
-        vx: 0.0,
-        vy: 0.0,
-    };
-    let mut k = 0;
+    let mut e0 = 0.0;
     for line in input.lines() {
         let p: Vec<&str> = line.split_whitespace().collect();
         if p.is_empty() {
@@ -70,36 +66,57 @@ fn main() {
         }
         let mut n = [0.0f64; 4];
         for i in 1..p.len() {
-            if i <= 4 {
+            if i <= 2 {
                 n[i - 1] = p[i].parse().unwrap();
             }
         }
         match p[0] {
+            "SPRING" => {
+                w.k = n[0];
+                w.mass = n[1];
+            }
             "DT" => w.dt = n[0],
-            "MASS" => w.mass = n[0],
-            "GRAVITY" => {
-                w.gx = n[0];
-                w.gy = n[1];
-            }
-            "DRAG" => w.drag = n[0],
-            "FORCE" => {
-                w.fx = n[0];
-                w.fy = n[1];
-            }
-            "BODY" => {
-                b = Body {
-                    px: n[0],
-                    py: n[1],
-                    vx: n[2],
-                    vy: n[3],
-                }
+            "START" => {
+                w.x = n[0];
+                w.v = n[1];
+                e0 = energy(w);
             }
             "RUN" => {
-                for _ in 0..(n[0] as i32) {
-                    step(&mut b, &w);
-                    k += 1;
-                    println!("{} {} {} {} {}", k, f4(b.px), f4(b.py), f4(b.vx), f4(b.vy));
-                }
+                w.steps = n[0] as u32;
+                let (ex, ev) = explicit(w);
+                let (sx, sv) = symplectic(w);
+                println!(
+                    "EXPLICIT {} {} {}",
+                    f4(ex),
+                    f4(ev),
+                    f4(ratio(
+                        energy(World {
+                            k: w.k,
+                            mass: w.mass,
+                            x: ex,
+                            v: ev,
+                            dt: w.dt,
+                            steps: w.steps
+                        }),
+                        e0
+                    ))
+                );
+                println!(
+                    "SYMPLECTIC {} {} {}",
+                    f4(sx),
+                    f4(sv),
+                    f4(ratio(
+                        energy(World {
+                            k: w.k,
+                            mass: w.mass,
+                            x: sx,
+                            v: sv,
+                            dt: w.dt,
+                            steps: w.steps
+                        }),
+                        e0
+                    ))
+                );
             }
             _ => {}
         }
