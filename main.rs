@@ -1,9 +1,20 @@
 use std::io::{self, Read};
 
-#[derive(Clone, Copy)]
-struct V2 {
-    x: f64,
-    y: f64,
+struct Body {
+    px: f64,
+    py: f64,
+    vx: f64,
+    vy: f64,
+}
+
+struct World {
+    dt: f64,
+    mass: f64,
+    gx: f64,
+    gy: f64,
+    drag: f64,
+    fx: f64,
+    fy: f64,
 }
 
 fn f4(x: f64) -> String {
@@ -15,70 +26,43 @@ fn f4(x: f64) -> String {
     }
 }
 
-fn add(a: V2, b: V2) -> V2 {
-    V2 {
-        x: a.x + b.x,
-        y: a.y + b.y,
-    }
-}
-fn sub(a: V2, b: V2) -> V2 {
-    V2 {
-        x: a.x - b.x,
-        y: a.y - b.y,
-    }
-}
-fn scale(a: V2, s: f64) -> V2 {
-    V2 {
-        x: a.x * s,
-        y: a.y * s,
-    }
-}
-fn length(a: V2) -> f64 {
-    (a.x * a.x + a.y * a.y).sqrt()
-}
-fn perp(a: V2) -> V2 {
-    V2 { x: -a.y, y: a.x }
-}
-
-fn dot(a: V2, b: V2) -> f64 {
-    a.x * b.x + a.y * b.y
-}
-
-fn cross(a: V2, b: V2) -> f64 {
-    a.x * b.y - a.y * b.x
-}
-
-fn normalize(a: V2) -> V2 {
-    if a.x == 0.0 && a.y == 0.0 {
-        V2 { x: 0.0, y: 0.0 }
+// Advance body b by one step of world w, in place.
+fn step(_b: &mut Body, _w: &World) {
+    // TODO: mass 0 means immovable (return at once). Otherwise:
+    //   net force = applied + mass * g - drag * v   (v from the START of the step)
+    //   acceleration = net force * (1 / mass)
+    //   update the velocity first, then the position with the NEW velocity
+    if _w.mass == 0.0 {
+        return;
     } else {
-        scale(a, 1.0 / length(a))
+        let fx = _w.fx + _w.mass * _w.gx - _w.drag * _b.vx;
+        let fy = _w.fy + _w.mass * _w.gy - _w.drag * _b.vy;
+        _b.vx += fx / _w.mass * _w.dt;
+        _b.vy += fy / _w.mass * _w.dt;
+        _b.px += _b.vx * _w.dt;
+        _b.py += _b.vy * _w.dt;
     }
-}
-
-fn project(a: V2, b: V2) -> V2 {
-    if b.x == 0.0 && b.y == 0.0 {
-        V2 { x: 0.0, y: 0.0 }
-    } else {
-        scale(b, dot(a, b) / dot(b, b))
-    }
-}
-
-fn reflect(v: V2, n: V2) -> V2 {
-    if n.x == 0.0 && n.y == 0.0 {
-        v
-    } else {
-        sub(v, scale(n, 2.0 * dot(v, n) / dot(n, n)))
-    }
-}
-
-fn show(v: V2) -> String {
-    format!("{} {}", f4(v.x), f4(v.y))
 }
 
 fn main() {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
+    let mut w = World {
+        dt: 0.0,
+        mass: 1.0,
+        gx: 0.0,
+        gy: 0.0,
+        drag: 0.0,
+        fx: 0.0,
+        fy: 0.0,
+    };
+    let mut b = Body {
+        px: 0.0,
+        py: 0.0,
+        vx: 0.0,
+        vy: 0.0,
+    };
+    let mut k = 0;
     for line in input.lines() {
         let p: Vec<&str> = line.split_whitespace().collect();
         if p.is_empty() {
@@ -90,19 +74,33 @@ fn main() {
                 n[i - 1] = p[i].parse().unwrap();
             }
         }
-        let a = V2 { x: n[0], y: n[1] };
-        let b = V2 { x: n[2], y: n[3] };
         match p[0] {
-            "ADD" => println!("{}", show(add(a, b))),
-            "SUB" => println!("{}", show(sub(a, b))),
-            "SCALE" => println!("{}", show(scale(a, n[2]))),
-            "DOT" => println!("{}", f4(dot(a, b))),
-            "CROSS" => println!("{}", f4(cross(a, b))),
-            "LEN" => println!("{}", f4(length(a))),
-            "NORM" => println!("{}", show(normalize(a))),
-            "PERP" => println!("{}", show(perp(a))),
-            "PROJ" => println!("{}", show(project(a, b))),
-            "REFLECT" => println!("{}", show(reflect(a, b))),
+            "DT" => w.dt = n[0],
+            "MASS" => w.mass = n[0],
+            "GRAVITY" => {
+                w.gx = n[0];
+                w.gy = n[1];
+            }
+            "DRAG" => w.drag = n[0],
+            "FORCE" => {
+                w.fx = n[0];
+                w.fy = n[1];
+            }
+            "BODY" => {
+                b = Body {
+                    px: n[0],
+                    py: n[1],
+                    vx: n[2],
+                    vy: n[3],
+                }
+            }
+            "RUN" => {
+                for _ in 0..(n[0] as i32) {
+                    step(&mut b, &w);
+                    k += 1;
+                    println!("{} {} {} {} {}", k, f4(b.px), f4(b.py), f4(b.vx), f4(b.vy));
+                }
+            }
             _ => {}
         }
     }
