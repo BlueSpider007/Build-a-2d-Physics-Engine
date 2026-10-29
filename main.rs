@@ -82,7 +82,7 @@ fn main() {
                 e0 = energy(w);
             }
             "RUN" => {
-                w.steps = n[0] as u32;
+                w.steps += n[0] as u32;
                 let (ex, ev) = explicit(w);
                 let (sx, sv) = symplectic(w);
                 println!(
