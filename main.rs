@@ -66,7 +66,7 @@ fn project(a: V2, b: V2) -> V2 {
 
 fn reflect(v: V2, n: V2) -> V2 {
     if n.x == 0.0 && n.y == 0.0 {
-        V2 { x: 0.0, y: 0.0 }
+        v
     } else {
         sub(v, scale(n, 2.0 * dot(v, n) / dot(n, n)))
     }
