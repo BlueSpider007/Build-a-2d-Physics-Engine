@@ -16,14 +16,14 @@ fn box_hit(a: &[f64], b: &[f64]) -> Option<(f64, f64, f64)> {
     // the smaller overlap (x on a tie); the normal's sign follows centre_b - centre_a.
     if a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1] {
         let hax = ((a[2] - a[0]) / 2.0).abs();
-        let cax = ((a[2] + a[0]) / 2.0).abs();
+        let cax = ((a[2] + a[0]) / 2.0);
         let hbx = ((b[2] - b[0]) / 2.0).abs();
-        let cbx = ((b[2] + b[0]) / 2.0).abs();
+        let cbx = ((b[2] + b[0]) / 2.0);
         let ox = hax + hbx - (cbx - cax).abs();
         let hay = ((a[3] - a[1]) / 2.0).abs();
-        let cay = ((a[3] + a[1]) / 2.0).abs();
+        let cay = ((a[3] + a[1]) / 2.0);
         let hby = ((b[3] - b[1]) / 2.0).abs();
-        let cby = ((b[3] + b[1]) / 2.0).abs();
+        let cby = ((b[3] + b[1]) / 2.0);
         let oy = hay + hby - (cby - cay).abs();
         let (x, y, depth);
 
