@@ -27,7 +27,7 @@ fn box_hit(a: &[f64], b: &[f64]) -> Option<(f64, f64, f64)> {
         let oy = hay + hby - (cby - cay).abs();
         let (x, y, depth);
 
-        if ox < oy {
+        if ox <= oy {
             depth = ox;
             if cbx >= cax {
                 (x, y) = (1.0, 0.0);
