@@ -13,7 +13,18 @@ fn f4(x: f64) -> String {
 fn advance(acc: i64, _elapsed: i64, _dt: i64, _max_frame: i64) -> (i64, i64) {
     // TODO: clamp elapsed to max_frame and add it to the bank (acc),
     // then spend the bank in whole steps of dt. Keep the leftover.
-    (0, acc)
+    let mut elapsed = _elapsed;
+    let mut acc = acc;
+    if elapsed > _max_frame {
+        elapsed = _max_frame
+    }
+    acc += elapsed;
+    let mut steps = 0;
+    while acc >= _dt {
+        acc -= _dt;
+        steps += 1;
+    }
+    (steps, acc)
 }
 
 fn main() {
@@ -36,7 +47,13 @@ fn main() {
                 let (steps, bank) = advance(acc, e, dt, max_frame);
                 acc = bank;
                 total += steps * dt;
-                println!("steps={} t={} acc={} alpha={}", steps, total, acc, f4(acc as f64 / dt as f64));
+                println!(
+                    "steps={} t={} acc={} alpha={}",
+                    steps,
+                    total,
+                    acc,
+                    f4(acc as f64 / dt as f64)
+                );
             }
             _ => {}
         }
