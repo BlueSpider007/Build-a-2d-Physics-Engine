@@ -7,7 +7,6 @@ struct World {
     dt: f64,
     x: f64,
     v: f64,
-    steps: u32,
 }
 
 fn f4(x: f64) -> String {
@@ -18,9 +17,11 @@ fn f4(x: f64) -> String {
         s
     }
 }
-fn energy(_w: World) -> f64 {
-    0.5 * _w.mass * _w.v * _w.v + 0.5 * _w.k * _w.x * _w.x
+
+fn energy(w: World) -> f64 {
+    0.5 * w.mass * w.v * w.v + 0.5 * w.k * w.x * w.x
 }
+
 fn ratio(e: f64, e0: f64) -> f64 {
     if e0 == 0.0 {
         1.0
@@ -28,94 +29,92 @@ fn ratio(e: f64, e0: f64) -> f64 {
         e / e0
     }
 }
-fn symplectic(_w: World) -> (f64, f64) {
-    let mut w = _w;
-    for _i in 0..w.steps {
+
+fn explicit(w: &mut World, steps: u32) {
+    for _ in 0..steps {
         let a = -w.k * w.x / w.mass;
-        w.v += a * w.dt;
         w.x += w.v * w.dt;
+        w.v += a * w.dt;
     }
-    (w.x, w.v)
 }
-fn explicit(_w: World) -> (f64, f64) {
-    let mut w = _w;
-    for _i in 0..w.steps {
+
+fn symplectic(w: &mut World, steps: u32) {
+    for _ in 0..steps {
         let a = -w.k * w.x / w.mass;
-        w.x += w.v * w.dt;
         w.v += a * w.dt;
+        w.x += w.v * w.dt;
     }
-    (w.x, w.v)
 }
 
 fn main() {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
-    let mut w = World {
-        k: 1.0,
-        mass: 1.0,
-        dt: 0.1,
+
+    let mut k = 1.0;
+    let mut mass = 1.0;
+    let mut dt = 0.1;
+
+    let mut ex = World {
+        k,
+        mass,
+        dt,
         x: 0.0,
         v: 0.0,
-        steps: 0,
     };
+    let mut sy = ex;
+
     let mut e0 = 0.0;
+
     for line in input.lines() {
         let p: Vec<&str> = line.split_whitespace().collect();
+
         if p.is_empty() {
             continue;
         }
-        let mut n = [0.0f64; 4];
-        for i in 1..p.len() {
-            if i <= 2 {
-                n[i - 1] = p[i].parse().unwrap();
-            }
-        }
+
         match p[0] {
             "SPRING" => {
-                w.k = n[0];
-                w.mass = n[1];
+                k = p[1].parse().unwrap();
+                mass = p[2].parse().unwrap();
+                ex.k = k;
+                ex.mass = mass;
+                sy.k = k;
+                sy.mass = mass;
             }
-            "DT" => w.dt = n[0],
+            "DT" => {
+                dt = p[1].parse().unwrap();
+                ex.dt = dt;
+                sy.dt = dt;
+            }
             "START" => {
-                w.x = n[0];
-                w.v = n[1];
-                e0 = energy(w);
+                let x: f64 = p[1].parse().unwrap();
+                let v: f64 = p[2].parse().unwrap();
+
+                ex.x = x;
+                ex.v = v;
+                sy.x = x;
+                sy.v = v;
+
+                e0 = energy(ex);
             }
             "RUN" => {
-                w.steps += n[0] as u32;
-                let (ex, ev) = explicit(w);
-                let (sx, sv) = symplectic(w);
+                let steps: u32 = p[1].parse().unwrap();
+
+                explicit(&mut ex, steps);
+                symplectic(&mut sy, steps);
+
                 println!(
                     "EXPLICIT {} {} {}",
-                    f4(ex),
-                    f4(ev),
-                    f4(ratio(
-                        energy(World {
-                            k: w.k,
-                            mass: w.mass,
-                            x: ex,
-                            v: ev,
-                            dt: w.dt,
-                            steps: w.steps
-                        }),
-                        e0
-                    ))
+                    f4(ex.x),
+                    f4(ex.v),
+                    f4(ratio(energy(ex), e0))
                 );
+
                 println!(
                     "SYMPLECTIC {} {} {}",
-                    f4(sx),
-                    f4(sv),
-                    f4(ratio(
-                        energy(World {
-                            k: w.k,
-                            mass: w.mass,
-                            x: sx,
-                            v: sv,
-                            dt: w.dt,
-                            steps: w.steps
-                        }),
-                        e0
-                    ))
+                    f4(sy.x),
+                    f4(sy.v),
+                    f4(ratio(energy(sy), e0))
                 );
             }
             _ => {}
