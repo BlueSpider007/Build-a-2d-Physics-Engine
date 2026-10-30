@@ -1,97 +1,98 @@
 use std::io::{self, Read};
 
-fn f4(x: f64) -> String {
-    let s = format!("{:.4}", x);
-    if s == "-0.0000" {
-        "0.0000".to_string()
-    } else {
-        s
-    }
+// Pairs are (i, j) with i < j. Sort them and remove duplicates.
+fn unique_sorted(mut p: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
+    p.sort();
+    p.dedup();
+    p
 }
 
-// a, b = [x0, y0, x1, y1]. Return None for no contact, else Some((nx, ny, depth)).
-fn box_hit(a: &[f64], b: &[f64]) -> Option<(f64, f64, f64)> {
-    // TODO: per axis, overlap = half_a + half_b - |centre_b - centre_a|.
-    // No contact if either overlap is negative. Otherwise use the axis with
-    // the smaller overlap (x on a tie); the normal's sign follows centre_b - centre_a.
-    if a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1] {
-        let hax = ((a[2] - a[0]) / 2.0).abs();
-        let cax = ((a[2] + a[0]) / 2.0);
-        let hbx = ((b[2] - b[0]) / 2.0).abs();
-        let cbx = ((b[2] + b[0]) / 2.0);
-        let ox = hax + hbx - (cbx - cax).abs();
-        let hay = ((a[3] - a[1]) / 2.0).abs();
-        let cay = ((a[3] + a[1]) / 2.0);
-        let hby = ((b[3] - b[1]) / 2.0).abs();
-        let cby = ((b[3] + b[1]) / 2.0);
-        let oy = hay + hby - (cby - cay).abs();
-        let (x, y, depth);
-
-        if ox <= oy {
-            depth = ox;
-            if cbx >= cax {
-                (x, y) = (1.0, 0.0);
-            } else {
-                (x, y) = (-1.0, 0.0);
-            }
-        } else {
-            depth = oy;
-            if cby >= cay {
-                (x, y) = (0.0, 1.0);
-            } else {
-                (x, y) = (0.0, -1.0);
+// Candidate pairs: bodies that share at least one grid cell.
+fn grid_pairs(boxes: &[[f64; 4]], size: f64) -> Vec<(usize, usize)> {
+    // TODO: for every body push (cell x, cell y, body) for each cell its box covers
+    // (f64::floor, then `as i64`), sort the entries, push the pairs inside each run
+    // of equal cells, then return unique_sorted(pairs).
+    let mut cells: Vec<(i64, i64, usize)> = vec![];
+    for i in 0..boxes.len() {
+        for x in (boxes[i][0] / size).floor() as i64..=(boxes[i][2] / size).floor() as i64 {
+            for y in (boxes[i][1] / size).floor() as i64..=(boxes[i][3] / size).floor() as i64 {
+                cells.push((x, y, i))
             }
         }
-        Some((x, y, depth))
-    } else {
-        None
     }
+    cells.sort();
+    let mut pairs: Vec<(usize, usize)> = vec![];
+    for i in 1..cells.len() {
+        if cells[i - 1].0 == cells[i].0 && cells[i - 1].1 == cells[i].1 {
+            pairs.push((cells[i - 1].2, cells[i].2));
+        }
+    }
+    unique_sorted(pairs)
 }
 
-// Return None for no contact, else Some((nx, ny, depth)); the normal points from A to B.
-fn circle_hit(ax: f64, ay: f64, ra: f64, bx: f64, by: f64, rb: f64) -> Option<(f64, f64, f64)> {
-    // TODO: compare squared distance with the squared radius sum, then
-    // normal = d / |d| (f64::sqrt), depth = r - |d|.
-    // Coincident centres: normal (1, 0), depth r.
-    let d2 = (bx - ax) * (bx - ax) + (by - ay) * (by - ay);
-    let r = ra + rb;
-    if d2 > r * r {
-        None
-    } else {
-        if bx - ax != 0.0 || by - ay != 0.0 {
-            let ad = d2.sqrt();
-            let dx = (bx - ax) / ad;
-            let dy = (by - ay) / ad;
-            let depth = r - ad;
-            Some((dx, dy, depth))
-        } else {
-            Some((1.0, 0.0, r))
+// Pairs whose boxes overlap (touching counts).
+fn sweep_pairs(boxes: &[[f64; 4]]) -> Vec<(usize, usize)> {
+    // TODO: sort the body indices by x0 (ties by index). For each body walk the
+    // later ones; stop when one starts right of the current body's x1; otherwise
+    // compare the y intervals.
+    let mut order: Vec<usize> = (0..boxes.len()).collect();
+    order.sort_by(|&a, &b| boxes[a][0].total_cmp(&boxes[b][0]).then_with(|| a.cmp(&b)));
+    let mut col = vec![];
+    for i in 0..order.len() {
+        let a = order[i];
+        for j in (i + 1)..order.len() {
+            let b = order[j];
+            if boxes[b][0] > boxes[a][2] {
+                break;
+            }
+
+            if boxes[a][1] <= boxes[b][3] && boxes[a][3] >= boxes[b][1] {
+                col.push((a.min(b), a.max(b)))
+            }
         }
     }
+    unique_sorted(col)
 }
 
 fn main() {
     let mut input = String::new();
     io::stdin().read_to_string(&mut input).unwrap();
+    let mut size = 1.0f64;
+    let mut boxes: Vec<[f64; 4]> = Vec::new();
     for line in input.lines() {
         let p: Vec<&str> = line.split_whitespace().collect();
         if p.is_empty() {
             continue;
         }
-        let mut n = [0.0f64; 8];
-        for i in 1..p.len() {
-            if i <= 8 {
-                n[i - 1] = p[i].parse().unwrap();
+        match p[0] {
+            "CELL" => size = p[1].parse().unwrap(),
+            "BODY" => {
+                let mut b = [0.0f64; 4];
+                for i in 0..4 {
+                    b[i] = p[i + 1].parse().unwrap();
+                }
+                boxes.push(b);
             }
-        }
-        let h = match p[0] {
-            "BOX" => box_hit(&n[0..4], &n[4..8]),
-            "CIRCLE" => circle_hit(n[0], n[1], n[2], n[3], n[4], n[5]),
-            _ => continue,
-        };
-        match h {
-            None => println!("NO_OVERLAP"),
-            Some((nx, ny, d)) => println!("HIT {} {} {}", f4(nx), f4(ny), f4(d)),
+            "PAIRS" | "SWEEP" => {
+                let n = boxes.len();
+                let grid = p[0] == "PAIRS";
+                let res = if grid {
+                    grid_pairs(&boxes, size)
+                } else {
+                    sweep_pairs(&boxes)
+                };
+                let word = if grid { "candidates" } else { "overlaps" };
+                println!(
+                    "naive={} {}={}",
+                    n * (n.saturating_sub(1)) / 2,
+                    word,
+                    res.len()
+                );
+                for pr in res {
+                    println!("{} {}", pr.0, pr.1);
+                }
+            }
+            _ => {}
         }
     }
 }
