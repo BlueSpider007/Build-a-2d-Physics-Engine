@@ -22,10 +22,22 @@ fn grid_pairs(boxes: &[[f64; 4]], size: f64) -> Vec<(usize, usize)> {
     }
     cells.sort();
     let mut pairs: Vec<(usize, usize)> = vec![];
-    for i in 1..cells.len() {
-        if cells[i - 1].0 == cells[i].0 && cells[i - 1].1 == cells[i].1 {
-            pairs.push((cells[i - 1].2, cells[i].2));
+    let mut start = 0;
+    while start < cells.len() {
+        let mut end = start + 1;
+
+        while end < cells.len() && cells[end].0 == cells[start].0 && cells[end].1 == cells[start].1
+        {
+            end += 1;
         }
+        for i in start..end {
+            for j in i + 1..end {
+                let a = cells[i].2;
+                let b = cells[j].2;
+                pairs.push((a.min(b), a.max(b)));
+            }
+        }
+        start = end;
     }
     unique_sorted(pairs)
 }
